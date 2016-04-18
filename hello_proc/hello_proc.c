@@ -17,9 +17,12 @@ MODULE_AUTHOR("Daniel Chen <kindwindser@gmail.com");
 
 ssize_t hello_proc_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
-	//int len;
+	char temp[] = "This is hello proc read function";
 	printk(KERN_INFO "hello proc read\n");
-	return count;
+	if (copy_to_user(buf, temp, sizeof(temp)))
+		return -EFAULT;
+
+	return sizeof(temp);
 }
 
 ssize_t hello_proc_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
@@ -58,7 +61,6 @@ struct file_operations hello_proc_fops =
 int __init init_hello_proc(void)
 {
 	struct proc_dir_entry *hello = NULL;
-	remove_proc_entry("hello_proc", NULL);
 	hello = proc_create("hello_proc", 0777, NULL, &hello_proc_fops);
 	if(hello == NULL)
    		return -ENOMEM;
