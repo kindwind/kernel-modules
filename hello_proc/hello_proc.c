@@ -57,6 +57,11 @@ struct file_operations hello_proc_fops =
 	.write = hello_proc_write
 };
 
+/*
+ * The __init token in the definition may look a little strange;
+ * it is a hint to the kernel that the given function is used only at initialization time.
+ * The module loader drops the initialization function after the module is loaded, making its memory available for other uses
+ */
 
 static int __init init_hello_proc(void)
 {
@@ -67,6 +72,13 @@ static int __init init_hello_proc(void)
 	printk(KERN_INFO "hello proc world!\n");
 	return 0;
 }
+
+/*
+ * The __exit modifier marks the code as being for module unload only (by causing the compiler to
+ * place it in a special ELF section). If your module is built directly into the kernel,
+ * or if your kernel is configured to disallow the unloading of modules, functions
+ * marked __exit are simply discarded. 
+ */
 
 static void __exit exit_hello_proc(void)
 {
