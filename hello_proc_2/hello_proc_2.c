@@ -17,24 +17,31 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Daniel Chen <kindwindser@gmail.com");
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0))
-int hello_proc_read(char *page, char **start, off_t off, int count, int *eof, void *data)
+static int hello_proc_read(char *page, char **start, off_t off, int count, int *eof, void *data)
 #else
-ssize_t hello_proc_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+static ssize_t hello_proc_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 #endif
 {
-	char temp[] = "This is hello proc read function";
-        printk(KERN_INFO "hello proc read\n");
-        if (copy_to_user(buf, temp, sizeof(temp)))
-                return -EFAULT;
+	char msg[] = "This is hello proc read function\n";
+        //printk(KERN_INFO "hello proc read\n");
+        if( copy_to_user(buf, msg, sizeof(msg)) ){
+		return 0;
+	}
 
-        return sizeof(temp);
+	if(*ppos == 0)
+	{
+		*ppos += count;
+		return count;
+	}
+	else
+		return 0;
 }
 
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0))
-int hello_proc_write(struct file *file, const char *buf, unsigned long count, void *data)
+static int hello_proc_write(struct file *file, const char *buf, unsigned long count, void *data)
 #else
-ssize_t hello_proc_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
+static ssize_t hello_proc_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 #endif
 {
 	char *p = NULL;
@@ -69,7 +76,7 @@ struct file_operations hello_proc_fops =
 };
 #endif
 
-int __init init_hello_proc(void)
+static int __init init_hello_proc(void)
 {
 	struct proc_dir_entry *hello = NULL;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0))
@@ -87,7 +94,7 @@ int __init init_hello_proc(void)
 	return 0;
 }
 
-void __exit exit_hello_proc(void)
+static void __exit exit_hello_proc(void)
 {
 	remove_proc_entry("hello_proc_2", NULL);
 	printk(KERN_INFO "Goodbye, hello_proc\n");
