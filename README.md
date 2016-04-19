@@ -9,3 +9,9 @@ message:
 
 solution:
 	sudo apt-get install linux-source
+
+
+usage:
+1.
+kernel module with parameter array:
+sudo insmod module-name parameter-array-name parameter-array-element-1,parameter-array-element-2,...,parameter-array-element-n
