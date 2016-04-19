@@ -58,7 +58,7 @@ struct file_operations hello_proc_fops =
 };
 
 
-int __init init_hello_proc(void)
+static int __init init_hello_proc(void)
 {
 	struct proc_dir_entry *hello = NULL;
 	hello = proc_create("hello_proc", 0777, NULL, &hello_proc_fops);
@@ -68,7 +68,7 @@ int __init init_hello_proc(void)
 	return 0;
 }
 
-void __exit exit_hello_proc(void)
+static void __exit exit_hello_proc(void)
 {
 	remove_proc_entry("hello_proc", NULL);
 	printk(KERN_INFO "Goodbye, hello_proc\n");
