@@ -93,6 +93,7 @@ static int __init init_cdevice(void)
 {
 	// dev_t is the type used to represent device numbers within the kernel
 	dev_t devno;
+	char buffer[128];
 	int result = 0, err = 0;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 0))
 	result = register_chrdev(cdev_major, DEVICE_NAME, &cdevice_fops);
@@ -111,6 +112,10 @@ static int __init init_cdevice(void)
 		// cdev_minor = MINOR(devno);
 	}
 #endif
+	printk(KERN_INFO "===== %d =====\n",print_dev_t(buffer, devno)); //the number of characters in buffers
+	printk(KERN_INFO "%s\n",buffer); //the number of characters in buffers
+	memset(buffer, 0, 128);
+	printk(KERN_INFO "===== %s =====\n",format_dev_t(buffer, devno));
 	if (result < 0) {
 		printk(KERN_WARNING "scull: can't get major %d\n", cdev_major);
 		return result;
