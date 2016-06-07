@@ -8,14 +8,41 @@
 #include <linux/slab.h>		/* for kmalloc(), kzalloc() */
 #include <asm/uaccess.h>	/* for copy_to_user(), copy_from_user() */
 #include <linux/version.h>
+#include <linux/proc_fs.h>	/* for proc file system */
 
 #define MODULE_NAME "cdevice"
 #define MAJOR_NUM 0
 #define MINOR_NUM 0
 #define DEVICE_NAME "cdevice"
+#define PROC_NAME "cdevice"
 
 unsigned int cdev_major = MAJOR_NUM, cdev_minor = MINOR_NUM;
 struct cdev *cdevp = NULL; /* Char device structure */
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 9, 0))
+static ssize_t cdevice_proc_read(struct file *file, char __user *buf, size_t count, loff_t *ppos){
+	char msg[] = "hello cdevice proc read\n";
+        //printk(KERN_INFO "hello proc read\n");
+        if( copy_to_user(buf, msg, sizeof(msg)) ){
+		return 0;
+	}
+
+	if(*ppos == 0)
+	{
+		*ppos += count;
+		return count;
+	}
+	else
+		return 0;
+}
+#else
+static int cdevice_proc_read(char *page, char **start, off_t off, int count, int *eof, void *data){
+	int len = 0;
+	len += sprintf(buffer+len, "hello cdevice proc read\n");
+	*eof = 1;
+	return len;
+}
+#endif
 
 static ssize_t cdevice_read(struct file *filp, char * __user buf, size_t count, loff_t *ppos)
 {
@@ -88,6 +115,12 @@ struct file_operations cdevice_fops = {
 	.release = cdevice_release
 };
 
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 9, 0))
+struct file_operations cdevice_proc_fops = {
+	.owner = THIS_MODULE,
+	.read = cdevice_proc_read,
+};
+#endif
 
 static int __init init_cdevice(void)
 {
@@ -95,6 +128,7 @@ static int __init init_cdevice(void)
 	dev_t devno;
 	char buffer[128];
 	int result = 0, err = 0;
+	struct proc_dir_entry *ent;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 0))
 	result = register_chrdev(cdev_major, DEVICE_NAME, &cdevice_fops);
 #else
@@ -135,8 +169,19 @@ static int __init init_cdevice(void)
 		goto fail;
 	}
 	printk(KERN_INFO "cdevice init: major = %d, minor = %d\n",cdev_major,cdev_minor);
-	return 0;
 #endif
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 9, 0))
+	ent = proc_create(PROC_NAME, 0, NULL, &cdevice_proc_fops);
+#else
+	ent = create_proc_read_entry(PROC_NAME, 0, NULL, cdevice_proc_fops, NULL); // name, mode, parent proc entry, read proc function, data
+#endif
+	if (!ent){
+		printk(KERN_INFO "create proc read entry for cdevice fail\n");
+	}
+
+	return 0;
+	
 fail:
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 0))
 	// allow a driver to free ranges of device numbers.
@@ -154,6 +199,8 @@ fail:
 static void __exit exit_cdevice(void)
 {
 	dev_t dev;
+	
+	remove_proc_entry(PROC_NAME, NULL);
 
     	dev = MKDEV(cdev_major, cdev_minor);
 	if( cdevp )
