@@ -17,11 +17,14 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Daniel Chen <kindwindser@gmail.com");
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0))
-static int hello_proc_read(char *page, char **start, off_t off, int count, int *eof, void *data)
+static int hello_proc_read(char *page, char **start, off_t off, int count, int *eof, void *data){
+	int len = 0;
+	len += sprintf(buffer+len, "This is hello proc read function\n");
+	*eof = 1;
+	return len;
+}
 #else
-static ssize_t hello_proc_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
-#endif
-{
+static ssize_t hello_proc_read(struct file *file, char __user *buf, size_t count, loff_t *ppos){
 	char msg[] = "This is hello proc read function\n";
         //printk(KERN_INFO "hello proc read\n");
         if( copy_to_user(buf, msg, sizeof(msg)) ){
@@ -36,6 +39,7 @@ static ssize_t hello_proc_read(struct file *file, char __user *buf, size_t count
 	else
 		return 0;
 }
+#endif
 
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0))
