@@ -1,6 +1,6 @@
 #!/bin/sh
 module="cdevice"
-device="cdevice"
+device="cdevice0"
 
 # invoke rmmod with all arguments we got
 /sbin/rmmod $module $* || exit 1

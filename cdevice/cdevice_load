@@ -1,6 +1,6 @@
 #!/bin/sh
 module="cdevice"
-device="cdevice"
+device="cdevice0"
 mode="644"
 
 
@@ -12,6 +12,8 @@ mode="644"
 rm -f /dev/${device}
 
 major=$(awk "\$2==\"$module\" {print \$1}" /proc/devices)
+
+echo major number $major
 
 mknod /dev/${device} c $major 0
 

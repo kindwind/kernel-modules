@@ -10,6 +10,8 @@
 #include <linux/version.h>
 #include <linux/proc_fs.h>	/* for proc file system */
 
+#include "cdevice.h"
+
 #define MODULE_NAME "cdevice"
 #define MAJOR_NUM 0
 #define MINOR_NUM 0
@@ -18,6 +20,112 @@
 
 unsigned int cdev_major = MAJOR_NUM, cdev_minor = MINOR_NUM;
 struct cdev *cdevp = NULL; /* Char device structure */
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 4, 0))
+long cdevice_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
+	int ret = -EINVAL;
+	int err = 0;
+	CDEV_CMD_SET_PARAM data_set;
+	CDEV_CMD_GET_PARAM data_get;
+	CDEV_CMD_EXCHANGE_PARAM data_exchange;
+	CDEV_CMD_EXCHANGE_PARAM data;
+	int value_get, value_set;
+	printk("cdevice ioctl\n");
+
+	data_get.val = 28;
+	value_get = 299;
+
+	data.val = 199;
+	/*
+	* extract the type and number bitfields, and don't decode
+	* wrong cmds: return ENOTTY (inappropriate ioctl) before access_ok( )
+	*/
+	if (_IOC_TYPE(cmd) != CDEV_IOC_MAGIC) return -ENOTTY;
+	if (_IOC_NR(cmd) > CDEV_IOC_MAXNR) return -ENOTTY;
+
+	/*
+	* the direction is a bitmask, and VERIFY_WRITE catches R/W
+	* transfers. `Type' is user-oriented, while
+	* access_ok is kernel-oriented, so the concept of "read" and
+	* "write" is reversed
+	*/
+	if (_IOC_DIR(cmd) & _IOC_READ)
+		err = !access_ok(VERIFY_WRITE, (void __user *)arg, _IOC_SIZE(cmd));
+	else if (_IOC_DIR(cmd) & _IOC_WRITE)
+		err = !access_ok(VERIFY_READ, (void __user *)arg, _IOC_SIZE(cmd));
+	
+	if (err) return -EFAULT;
+
+	switch (cmd){
+		case CDEV_IOC_CMD_INIT:
+			printk("command init\n");
+			
+			ret = 0;
+			break;
+		case CDEV_IOC_CMD_GET_VALUE:
+			printk("command get value\n");
+			
+			return value_get;
+			break;
+		case CDEV_IOC_CMD_GET_POINTER:
+			printk("command get pointer\n");
+			
+			if ( !access_ok(VERIFY_WRITE, (void __user *)arg, _IOC_SIZE(cmd)) ) {
+				return -EFAULT;
+			}
+			if ( copy_to_user((int __user *)arg, &data_get, sizeof(data_get)) ) {
+				return -EFAULT;
+			}
+			ret = 0;
+			break;
+		case CDEV_IOC_CMD_SET_VALUE:
+			printk("command set value\n");
+			
+			if (! capable (CAP_SYS_ADMIN))
+				return -EPERM;
+			value_set = arg;
+			printk("value_set: %d\n", value_set);
+			ret = 0;
+			break;
+		case CDEV_IOC_CMD_SET_POINTER:
+			printk("command set pointer\n");
+			
+			if (! capable (CAP_SYS_ADMIN)) {
+				printk("not CAP_SYS_ADMIN\n");
+				return -EPERM;
+			}
+			if ( copy_from_user(&data_set, (int __user *)arg, sizeof(data_set)) ) {
+    			return -EFAULT;
+			}
+			printk("data_set.val: %d\n", data_set.val);
+			ret = 0;
+			break;
+		case CDEV_IOC_CMD_EXCHANGE:
+			if (! capable (CAP_SYS_ADMIN))
+				return -EPERM;
+			data_exchange.val = data.val;
+			if ( copy_from_user(&data, (int __user *)arg, sizeof(data)) ) {
+    			return -EFAULT;
+			}
+			printk("data.val: %d\n", data.val);
+			if ( copy_to_user((int __user *)arg, &data_exchange, sizeof(data_exchange)) ) {
+				return -EFAULT;
+			}
+			ret = 0;
+			break;
+		default:
+			printk("command Error\n");
+			break;
+	}
+	return ret;
+}
+#else
+int cdevice_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg){
+	int error = -EINVAL;
+
+	return error;
+}
+#endif
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 9, 0))
 static ssize_t cdevice_proc_read(struct file *file, char __user *buf, size_t count, loff_t *ppos){
@@ -112,7 +220,12 @@ struct file_operations cdevice_fops = {
 	.read = cdevice_read,
 	.write = cdevice_write,
 	.open = cdevice_open,
-	.release = cdevice_release
+	.release = cdevice_release,
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 4, 0))
+	.unlocked_ioctl = cdevice_unlocked_ioctl
+#else
+	.ioctl = cdevice_ioctl
+#endif
 };
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 9, 0))
@@ -154,6 +267,7 @@ static int __init init_cdevice(void)
 		printk(KERN_WARNING "scull: can't get major %d\n", cdev_major);
 		return result;
 	}
+	printk("major: %d\n", cdev_major);
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 0))
 #else
 	cdevp = kzalloc(sizeof(struct cdev), GFP_KERNEL);
