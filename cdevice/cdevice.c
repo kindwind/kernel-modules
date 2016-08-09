@@ -9,6 +9,7 @@
 #include <asm/uaccess.h>	/* for copy_to_user(), copy_from_user() */
 #include <linux/version.h>
 #include <linux/proc_fs.h>	/* for proc file system */
+#include <asm/atomic.h>		/* for race condition */
 
 #include "cdevice.h"
 
@@ -21,6 +22,9 @@
 unsigned int cdev_major = MAJOR_NUM, cdev_minor = MINOR_NUM;
 struct cdev *cdevp = NULL; /* Char device structure */
 
+atomic_t v = ATOMIC_INIT(0);
+int gi = 1;
+
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 4, 0))
 long cdevice_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
 	int ret = -EINVAL;
@@ -30,7 +34,7 @@ long cdevice_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 	CDEV_CMD_EXCHANGE_PARAM data_exchange;
 	CDEV_CMD_EXCHANGE_PARAM data;
 	int value_get, value_set;
-	printk("cdevice ioctl\n");
+	printk("character device ioctl\n");
 
 	data_get.val = 28;
 	value_get = 299;
@@ -59,7 +63,16 @@ long cdevice_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 	switch (cmd){
 		case CDEV_IOC_CMD_INIT:
 			printk("command init\n");
-			
+			atomic_set(&v, gi);
+			printk("set atomic v: %d\n", atomic_read(&v));
+			atomic_inc(&v);
+			printk("increase atomic v: %d\n", atomic_read(&v));
+			atomic_dec(&v);
+			printk("decrease atomic v: %d\n", atomic_read(&v));
+			err = atomic_inc_and_test(&v); // if atomic value is 0, then the return value is true; otherwise, it is false
+			printk("increase and test atomic return: %d, v: %d\n", err, atomic_read(&v));
+			err = atomic_dec_and_test(&v); // if atomic value is 0, then the return value is true; otherwise, it is false
+			printk("decrease and test atomic return: %d, v: %d\n", err, atomic_read(&v));
 			ret = 0;
 			break;
 		case CDEV_IOC_CMD_GET_VALUE:
@@ -85,6 +98,13 @@ long cdevice_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 				return -EPERM;
 			value_set = arg;
 			printk("value_set: %d\n", value_set);
+			printk("atomic v: %d\n", atomic_read(&v));
+			atomic_add(value_set, &v);
+			printk("add atomic v: %d\n", atomic_read(&v));
+			atomic_sub(value_set, &v);
+			printk("subtract atomic v: %d\n", atomic_read(&v));
+			err = atomic_sub_and_test(value_set, &v); // if atomic value is 0, then the return value is true; otherwise, it is false
+			printk("subtract and test atomic return: %d, v: %d\n", err, atomic_read(&v));
 			ret = 0;
 			break;
 		case CDEV_IOC_CMD_SET_POINTER:
@@ -98,6 +118,9 @@ long cdevice_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long a
     			return -EFAULT;
 			}
 			printk("data_set.val: %d\n", data_set.val);
+			printk("atomic v: %d\n", atomic_read(&v));
+			err = atomic_add_negative(data_set.val, &v); // return value is true if the result is negative, false otherwise
+			printk("add negative atomic return: %d, v: %d\n", err, atomic_read(&v));
 			ret = 0;
 			break;
 		case CDEV_IOC_CMD_EXCHANGE:
@@ -108,6 +131,11 @@ long cdevice_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long a
     			return -EFAULT;
 			}
 			printk("data.val: %d\n", data.val);
+			printk("atomic v: %d\n", atomic_read(&v));
+			printk("add and return atomic v: %d\n", atomic_add_return(data.val, &v));
+			printk("subtract and return atomic v: %d\n", atomic_sub_return(data.val, &v));
+			printk("increase and return atomic v: %d\n", atomic_inc_return(&v));
+			printk("decrease and return atomic v: %d\n", atomic_dec_return(&v));
 			if ( copy_to_user((int __user *)arg, &data_exchange, sizeof(data_exchange)) ) {
 				return -EFAULT;
 			}
@@ -129,7 +157,7 @@ int cdevice_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsi
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 9, 0))
 static ssize_t cdevice_proc_read(struct file *file, char __user *buf, size_t count, loff_t *ppos){
-	char msg[] = "hello cdevice proc read\n";
+	char msg[] = "hello character device proc read\n";
         //printk(KERN_INFO "hello proc read\n");
         if( copy_to_user(buf, msg, sizeof(msg)) ){
 		return 0;
@@ -146,7 +174,7 @@ static ssize_t cdevice_proc_read(struct file *file, char __user *buf, size_t cou
 #else
 static int cdevice_proc_read(char *page, char **start, off_t off, int count, int *eof, void *data){
 	int len = 0;
-	len += sprintf(buffer+len, "hello cdevice proc read\n");
+	len += sprintf(buffer+len, "hello character device proc read\n");
 	*eof = 1;
 	return len;
 }
@@ -155,10 +183,10 @@ static int cdevice_proc_read(char *page, char **start, off_t off, int count, int
 static ssize_t cdevice_read(struct file *filp, char * __user buf, size_t count, loff_t *ppos)
 {
 	//char *msg = "cdevice read\n";
-	char *msg = "cdevice read\n";
+	char *msg = "character device read\n";
 	ssize_t retval = 0;
 
-	printk(KERN_INFO "cdevice read count = %d, offset = %lld\n",count, *ppos);
+	printk(KERN_INFO "character device read count = %d, offset = %lld\n",count, *ppos);
 	if (*ppos >= strlen(msg))
 		goto out;
 	if (*ppos + count > strlen(msg) )
@@ -178,7 +206,7 @@ static ssize_t cdevice_write(struct file *filp, const char * __user buf, size_t 
 {
 	ssize_t retval = -ENOMEM; /* value used in "goto out" statements */
 	char *datap = NULL;
-	printk(KERN_INFO "cdevice write\n");
+	printk(KERN_INFO "character device write\n");
 	datap = kzalloc(count, GFP_KERNEL);
     	if (datap == NULL) {
         	printk(KERN_INFO "kzalloc failed\n");
@@ -204,14 +232,14 @@ out:
 // struct file represents an open file, and struct inode represents a file on disk.
 static int cdevice_open(struct inode *inode, struct file *filp)
 {
-	printk(KERN_INFO "cdevice open\n");
+	printk(KERN_INFO "character device open\n");
 	return 0;
 }
 
 // Shut down the device on last close
 static int cdevice_release(struct inode *inode, struct file *filp)
 {
-	printk(KERN_INFO "cdevice close\n");
+	printk(KERN_INFO "character device close\n");
 	return 0;
 }
 
@@ -282,7 +310,7 @@ static int __init init_cdevice(void)
 		printk(KERN_NOTICE "Error %d adding cdevice", err);
 		goto fail;
 	}
-	printk(KERN_INFO "cdevice init: major = %d, minor = %d\n",cdev_major,cdev_minor);
+	printk(KERN_INFO "character device init: major = %d, minor = %d\n",cdev_major,cdev_minor);
 #endif
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 9, 0))
@@ -291,7 +319,7 @@ static int __init init_cdevice(void)
 	ent = create_proc_read_entry(PROC_NAME, 0, NULL, cdevice_proc_fops, NULL); // name, mode, parent proc entry, read proc function, data
 #endif
 	if (!ent){
-		printk(KERN_INFO "create proc read entry for cdevice fail\n");
+		printk(KERN_INFO "create proc read entry for character device fail\n");
 	}
 
 	return 0;
@@ -325,7 +353,7 @@ static void __exit exit_cdevice(void)
 #else
     	unregister_chrdev_region(dev, 1);
 #endif
-	printk(KERN_INFO "cdevice exit\n");
+	printk(KERN_INFO "character device exit\n");
 }
 
 
