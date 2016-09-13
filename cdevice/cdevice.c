@@ -265,22 +265,23 @@ struct file_operations cdevice_proc_fops = {
 
 static int __init init_cdevice(void)
 {
-	// dev_t is the type used to represent device numbers within the kernel
-	dev_t devno;
+	dev_t devno;	// dev_t is the type used to represent device numbers within the kernel
 	char buffer[128];
 	int result = 0, err = 0;
 	struct proc_dir_entry *ent;
+
+	/* Register a character device */
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 0))
-	result = register_chrdev(cdev_major, DEVICE_NAME, &cdevice_fops);
+	result = register_chrdev(cdev_major, DEVICE_NAME, &cdevice_fops);	// DEVICE_NAME will appear in /proc/devices
 #else
-	if ( cdev_major ) {
+	if ( cdev_major ) { // specific major number
 		// Macro that builds a dev_t data item from the major and minor numbers
 		devno = MKDEV(cdev_major, cdev_minor);
 		// allow a driver to allocate ranges of device numbers.
-		result = register_chrdev_region(devno, 1, DEVICE_NAME);
-	} else {
-		// allow a driver to allocate ranges of device numbers.
 		// register_chrdev_region should be used when the desired major number is known
+		result = register_chrdev_region(devno, 1, DEVICE_NAME);
+	} else { // dynamic get major number, devno for output device number
+		// allow a driver to allocate ranges of device numbers.
 		result = alloc_chrdev_region(&devno, cdev_minor, 1, DEVICE_NAME);
 		// Macros that extract the major and minor numbers from a device number.
 		cdev_major = MAJOR(devno);
@@ -291,34 +292,35 @@ static int __init init_cdevice(void)
 	printk(KERN_INFO "%s\n",buffer); //the number of characters in buffers
 	memset(buffer, 0, 128);
 	printk(KERN_INFO "===== %s =====\n",format_dev_t(buffer, devno));
-	if (result < 0) {
-		printk(KERN_WARNING "scull: can't get major %d\n", cdev_major);
+	if ( result < 0 ) {
+		printk(KERN_WARNING "can't get major %d\n", cdev_major);
 		return result;
 	}
 	printk("major: %d\n", cdev_major);
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 0))
 #else
 	cdevp = kzalloc(sizeof(struct cdev), GFP_KERNEL);
-    	if (cdevp == NULL) {
-        	printk(KERN_INFO "kzalloc failed\n");
-        	goto fail;
-    	}
+    if (cdevp == NULL) {
+       	printk(KERN_INFO "kzalloc failed\n");
+       	goto fail;
+    }
 	cdev_init(cdevp, &cdevice_fops);
 	cdevp->owner = THIS_MODULE;
 	err = cdev_add(cdevp, devno, 1);
-	if (err){
+	if (err) {
 		printk(KERN_NOTICE "Error %d adding cdevice", err);
 		goto fail;
 	}
 	printk(KERN_INFO "character device init: major = %d, minor = %d\n",cdev_major,cdev_minor);
 #endif
 
+	/* Create proc entry */
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 9, 0))
 	ent = proc_create(PROC_NAME, 0, NULL, &cdevice_proc_fops);
 #else
 	ent = create_proc_read_entry(PROC_NAME, 0, NULL, cdevice_proc_fops, NULL); // name, mode, parent proc entry, read proc function, data
 #endif
-	if (!ent){
+	if ( !ent )	{
 		printk(KERN_INFO "create proc read entry for character device fail\n");
 	}
 
@@ -330,12 +332,12 @@ fail:
 	unregister_chrdev(cdev_major, DEVICE_NAME);
 #else
 	if (cdevp) {
-        	kfree(cdevp);
-        	cdevp = NULL;
-    	}
-    	unregister_chrdev_region(devno, 1); 
+        kfree(cdevp);
+        cdevp = NULL;
+    }
+    unregister_chrdev_region(devno, 1); 
 #endif
-    	return err;  
+    return err;  
 }
 
 static void __exit exit_cdevice(void)
@@ -343,15 +345,14 @@ static void __exit exit_cdevice(void)
 	dev_t dev;
 	
 	remove_proc_entry(PROC_NAME, NULL);
-
-    	dev = MKDEV(cdev_major, cdev_minor);
-	if( cdevp )
+	dev = MKDEV(cdev_major, cdev_minor);
+	if ( cdevp )
 		cdev_del(cdevp);
 	// allow a driver to free ranges of device numbers.
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 0))
 	unregister_chrdev(cdev_major, DEVICE_NAME);
 #else
-    	unregister_chrdev_region(dev, 1);
+	unregister_chrdev_region(dev, 1);
 #endif
 	printk(KERN_INFO "character device exit\n");
 }
