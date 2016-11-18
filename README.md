@@ -15,3 +15,8 @@ usage:
 1.
 kernel module with parameter array:
 sudo insmod module-name parameter-array-name parameter-array-element-1,parameter-array-element-2,...,parameter-array-element-n
+
+
+History:
+20161118
+    1.	Integraed codes in GitHub with Jenkins (Continuous Integration Server) to make it auto build.
