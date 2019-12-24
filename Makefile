@@ -1,4 +1,4 @@
-LKMODULE_DIRS = cdevice hello_param hello_proc hello_proc_2
+LKMODULE_DIRS = cdevice hello_param hello_proc hello_proc_2 get_time
 
 default: all
 
