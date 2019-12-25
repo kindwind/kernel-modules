@@ -2,15 +2,19 @@
  * Linux Kernel 2.6.39
  */
 
+#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <linux/fs.h>
 #include <linux/slab.h>	/* for kmalloc() */
-#include <asm/uaccess.h>	/* for copy_from_user */
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 11, 12))
+#include <linux/uaccess.h>	/* for copy_to_user(), copy_from_user() */
+#else
+#include <asm/uaccess.h>	/* for copy_to_user(), copy_from_user() */
+#endif
 #include <linux/seq_file.h>	/* for seq_read */
-#include <linux/version.h>
 
 MODULE_DESCRIPTION("Hello Proc Filesystem");
 MODULE_LICENSE("GPL");

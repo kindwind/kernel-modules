@@ -2,13 +2,18 @@
  * Linux Kernel 4.2.0-27
  */
 
+#include <linux/version.h>	/* for LINUX_VERSION_CODE and KERNEL_VERSION */
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <linux/fs.h>
 #include <linux/slab.h>	/* for kmalloc() */
-#include <asm/uaccess.h>	/* for copy_from_user */
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 11, 12))
+#include <linux/uaccess.h>	/* for copy_to_user(), copy_from_user() */
+#else
+#include <asm/uaccess.h>	/* for copy_to_user(), copy_from_user() */
+#endif
 #include <linux/seq_file.h>	/* for seq_read */
 
 MODULE_DESCRIPTION("Hello Proc Filesystem");

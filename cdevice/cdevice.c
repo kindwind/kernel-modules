@@ -6,8 +6,12 @@
 #include <linux/kdev_t.h>	/* for MKDEV */
 #include <linux/cdev.h>		/* for sturct cdev */
 #include <linux/slab.h>		/* for kmalloc(), kzalloc() */
-#include <asm/uaccess.h>	/* for copy_to_user(), copy_from_user() */
 #include <linux/version.h>
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 11, 12))
+#include <linux/uaccess.h>	/* for copy_to_user(), copy_from_user() */
+#else
+#include <asm/uaccess.h>	/* for copy_to_user(), copy_from_user() */
+#endif
 #include <linux/proc_fs.h>	/* for proc file system */
 #include <asm/atomic.h>		/* for race condition */
 
